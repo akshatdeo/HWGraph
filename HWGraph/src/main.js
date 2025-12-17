@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'node:path';
+import { promises as fs } from 'node:fs';
 import started from 'electron-squirrel-startup';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -22,6 +23,26 @@ ipcMain.handle('dialog:openFile', async () => {
   }
 
   return result.filePaths[0];
+});
+
+ipcMain.handle('file:read', async (event, filePath) => {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const stats = await fs.stat(filePath);
+
+    return {
+      success: true,
+      content,
+      size: stats.size,
+      filename: path.basename(filePath)
+    };
+  } catch (error) {
+    console.error('Error reading file:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 });
 
 const createWindow = () => {

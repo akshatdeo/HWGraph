@@ -4,4 +4,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
+  readFile: (filePath) => ipcRenderer.invoke('file:read', filePath),
 });

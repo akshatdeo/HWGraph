@@ -8,6 +8,9 @@ interface SensorTreeProps {
   searchQuery: string;
   expandedCategories: Set<string>;
   onToggleCategory: (categoryKey: string) => void;
+  expandedFiles: Set<string>;
+  onToggleFile: (fileId: string) => void;
+  onDeleteFile: (fileId: string) => void;
 }
 
 export function SensorTree({
@@ -17,6 +20,9 @@ export function SensorTree({
   searchQuery,
   expandedCategories,
   onToggleCategory,
+  expandedFiles,
+  onToggleFile,
+  onDeleteFile,
 }: SensorTreeProps) {
   // Color palette for sensor indicators
   const colors = [
@@ -89,22 +95,57 @@ export function SensorTree({
 
   return (
     <div className="space-y-2">
-      {files.map((file, fileIndex) => (
-        <div key={file.id}>
-          {/* File Header (only show if multiple files) */}
-          {files.length > 1 && (
-            <div className="mb-3 pb-2 border-b border-gray-700">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      {files.map((file, fileIndex) => {
+        const isFileExpanded = expandedFiles.has(file.id);
+
+        return (
+          <div key={file.id} className="mb-3">
+            {/* File Header - Always show, collapsible */}
+            <div className="mb-2">
+              <div
+                className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-700/50 cursor-pointer transition-colors group"
+                onClick={() => onToggleFile(file.id)}
+              >
+                {/* Expand/Collapse Icon */}
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isFileExpanded ? 'rotate-90' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+
+                {/* File Icon */}
+                <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span className="text-sm font-semibold text-gray-300 truncate">{file.filename}</span>
+
+                {/* File Name */}
+                <span className="flex-1 text-sm font-semibold text-gray-200 truncate" title={file.filename}>
+                  {file.filename}
+                </span>
+
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Delete "${file.filename}"?`)) {
+                      onDeleteFile(file.id);
+                    }
+                  }}
+                  className="flex-shrink-0 p-1 text-gray-500 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete file"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               </div>
             </div>
-          )}
 
-          {/* Categories */}
-          {file.categories.map((category) => {
+            {/* Categories - Only show if file is expanded */}
+            {isFileExpanded && file.categories.map((category) => {
             if (!categoryHasMatches(category)) return null;
 
             const categoryKey = getCategoryKey(file.id, category.id);
@@ -223,8 +264,9 @@ export function SensorTree({
               </div>
             );
           })}
-        </div>
-      ))}
+          </div>
+        );
+      })}
 
       {/* No results message */}
       {searchQuery && files.every((file) => file.categories.every((cat) => !categoryHasMatches(cat))) && (

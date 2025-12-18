@@ -7,12 +7,14 @@ interface VisualizationViewProps {
   files: LoadedFile[];
   onLoadMore: () => void;
   onBack: () => void;
+  onDeleteFile: (fileId: string) => void;
 }
 
-export function VisualizationView({ files, onLoadMore, onBack }: VisualizationViewProps) {
+export function VisualizationView({ files, onLoadMore, onBack, onDeleteFile }: VisualizationViewProps) {
   const [selectedSensors, setSelectedSensors] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   // Debug: Log files on mount and changes
   useEffect(() => {
@@ -24,12 +26,18 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
     }
   }, [files]);
 
-  // Auto-expand first category of first file on mount
+  // Auto-expand first file and first category on mount
   useEffect(() => {
-    if (files.length > 0 && files[0].categories.length > 0 && expandedCategories.size === 0) {
-      const firstCategoryKey = `${files[0].id}:${files[0].categories[0].id}`;
-      console.log('Auto-expanding first category:', firstCategoryKey);
-      setExpandedCategories(new Set([firstCategoryKey]));
+    if (files.length > 0 && expandedFiles.size === 0) {
+      // Expand first file
+      setExpandedFiles(new Set([files[0].id]));
+
+      // Expand first category of first file
+      if (files[0].categories.length > 0 && expandedCategories.size === 0) {
+        const firstCategoryKey = `${files[0].id}:${files[0].categories[0].id}`;
+        console.log('Auto-expanding first category:', firstCategoryKey);
+        setExpandedCategories(new Set([firstCategoryKey]));
+      }
     }
   }, [files]);
 
@@ -63,6 +71,52 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
     });
   };
 
+  const handleToggleFile = (fileId: string) => {
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileId)) {
+        next.delete(fileId);
+      } else {
+        next.add(fileId);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteFile = (fileId: string) => {
+    // Call parent's delete handler to remove from files array
+    onDeleteFile(fileId);
+
+    // Remove file from expanded files
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+      next.delete(fileId);
+      return next;
+    });
+
+    // Remove all sensors from this file from selected sensors
+    setSelectedSensors((prev) => {
+      const next = new Set(prev);
+      Array.from(next).forEach((key) => {
+        if (key.startsWith(`${fileId}:`)) {
+          next.delete(key);
+        }
+      });
+      return next;
+    });
+
+    // Remove all categories from this file from expanded categories
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      Array.from(next).forEach((key) => {
+        if (key.startsWith(`${fileId}:`)) {
+          next.delete(key);
+        }
+      });
+      return next;
+    });
+  };
+
   const handleSelectAll = () => {
     const allSensorKeys = new Set<string>();
     files.forEach((file) => {
@@ -75,26 +129,10 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
     setSelectedSensors(allSensorKeys);
   };
 
-  if (files.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-400 mb-4">No files loaded</p>
-          <button
-            onClick={onBack}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-          >
-            Load a File
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
+    <div className="h-screen bg-gray-900 text-gray-100 flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between">
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
@@ -120,11 +158,11 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         {/* Left Sidebar - Sensor Selector */}
-        <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col overflow-hidden">
           {/* Search Bar */}
-          <div className="p-4 border-b border-gray-700">
+          <div className="p-4 border-b border-gray-700 flex-shrink-0">
             <div className="relative">
               <input
                 type="text"
@@ -134,7 +172,7 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
                 className="w-full px-4 py-2 pl-10 bg-gray-900 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -145,7 +183,7 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
           </div>
 
           {/* Selection Summary */}
-          <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
             <span className="text-sm text-gray-400">
               {selectedSensors.size} selected
             </span>
@@ -167,7 +205,7 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
           </div>
 
           {/* Sensor Tree */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 min-h-0">
             <SensorTree
               files={files}
               selectedSensors={selectedSensors}
@@ -175,12 +213,15 @@ export function VisualizationView({ files, onLoadMore, onBack }: VisualizationVi
               searchQuery={searchQuery}
               expandedCategories={expandedCategories}
               onToggleCategory={handleToggleCategory}
+              expandedFiles={expandedFiles}
+              onToggleFile={handleToggleFile}
+              onDeleteFile={handleDeleteFile}
             />
           </div>
         </div>
 
         {/* Right Area - Chart */}
-        <div className="flex-1 flex flex-col bg-gray-900">
+        <div className="flex-1 flex flex-col bg-gray-900 min-h-0">
           <TimeSeriesChart files={files} selectedSensors={selectedSensors} />
         </div>
       </div>

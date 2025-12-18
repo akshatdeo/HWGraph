@@ -158,6 +158,10 @@ const App = () => {
     }
   };
 
+  const handleDeleteFile = (fileId: string) => {
+    setLoadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
   // Render visualization view if files are loaded and view is set
   if (currentView === 'visualization') {
     return (
@@ -165,6 +169,7 @@ const App = () => {
         files={loadedFiles}
         onLoadMore={() => setCurrentView('landing')}
         onBack={() => setCurrentView('landing')}
+        onDeleteFile={handleDeleteFile}
       />
     );
   }

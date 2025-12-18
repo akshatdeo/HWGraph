@@ -81,7 +81,7 @@ function getSensorData(file: LoadedFile, sensor: Sensor): DataPoint[] {
 export function transformToChartData(
   files: LoadedFile[],
   selectedSensorKeys: Set<string>
-): { series: ChartSeries[]; yAxisConfigs: YAxisConfig[] } {
+): { series: ChartSeries[]; yAxisConfigs: YAxisConfig[]; startTimestamp: number } {
   console.log('transformToChartData called with:', files.length, 'files and', selectedSensorKeys.size, 'selected sensors');
 
   const seriesList: ChartSeries[] = [];
@@ -91,6 +91,33 @@ export function transformToChartData(
   // Convert selected sensor keys to array and sort for consistent coloring
   const selectedArray = Array.from(selectedSensorKeys).sort();
   console.log('Selected sensor keys:', selectedArray);
+
+  // Calculate the minimum timestamp for EACH file independently
+  // This allows each file to have its own time zero
+  const fileStartTimestamps = new Map<string, number>();
+
+  selectedArray.forEach((key) => {
+    const [fileId, sensorId] = key.split(':');
+    const result = findSensor(files, fileId, sensorId);
+    if (!result) return;
+
+    const { file, sensor } = result;
+    const dataPoints = getSensorData(file, sensor);
+
+    // Only update if we haven't seen this file yet or found an earlier timestamp
+    if (dataPoints.length > 0) {
+      const firstTimestamp = dataPoints[0].timestamp;
+      const currentMin = fileStartTimestamps.get(fileId);
+      if (currentMin === undefined || firstTimestamp < currentMin) {
+        fileStartTimestamps.set(fileId, firstTimestamp);
+      }
+    }
+  });
+
+  // Fallback: if no data found for any file, use 0
+  const globalStartTimestamp = fileStartTimestamps.size > 0
+    ? Math.min(...Array.from(fileStartTimestamps.values()))
+    : 0;
 
   selectedArray.forEach((key, index) => {
     const [fileId, sensorId] = key.split(':');
@@ -119,8 +146,15 @@ export function transformToChartData(
       });
     }
 
-    // Transform data points to [timestamp, value] format
-    const chartData: [number, number | null][] = dataPoints.map(dp => [dp.timestamp, dp.value]);
+    // Get THIS file's start timestamp (each file has its own time zero)
+    const fileStartTimestamp = fileStartTimestamps.get(fileId) || 0;
+
+    // Transform data points to [relativeSeconds, value] format
+    // Convert timestamps to seconds relative to THIS FILE's first timestamp
+    const chartData: [number, number | null][] = dataPoints.map(dp => [
+      (dp.timestamp - fileStartTimestamp) / 1000, // Convert ms to seconds relative to this file's start
+      dp.value
+    ]);
 
     // Create series name (include filename if multiple files)
     const seriesName = files.length > 1
@@ -142,7 +176,33 @@ export function transformToChartData(
     });
   });
 
-  return { series: seriesList, yAxisConfigs };
+  return { series: seriesList, yAxisConfigs, startTimestamp: globalStartTimestamp };
+}
+
+/**
+ * Format seconds into a human-readable relative time string
+ * Examples: "0s", "10s", "1m 30s", "5m 20s", "1h 15m"
+ */
+function formatRelativeTime(seconds: number): string {
+  if (seconds < 0) seconds = 0;
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    if (minutes > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${hours}h`;
+  } else if (minutes > 0) {
+    if (secs > 0) {
+      return `${minutes}m ${secs}s`;
+    }
+    return `${minutes}m`;
+  } else {
+    return `${secs}s`;
+  }
 }
 
 /**
@@ -155,10 +215,10 @@ export function createChartOption(
   return {
     backgroundColor: 'transparent',
     grid: {
-      left: 60 + (Math.floor(yAxisConfigs.filter(a => a.position === 'left').length / 1) * 60),
-      right: 60 + (Math.floor(yAxisConfigs.filter(a => a.position === 'right').length / 1) * 60),
-      top: 60,
-      bottom: 80,
+      left: 50 + (Math.floor(yAxisConfigs.filter(a => a.position === 'left').length / 1) * 60),
+      right: 50 + (Math.floor(yAxisConfigs.filter(a => a.position === 'right').length / 1) * 60),
+      top: 40,
+      bottom: 75,
       containLabel: false,
     },
     tooltip: {
@@ -179,9 +239,9 @@ export function createChartOption(
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return '';
 
-        const timestamp = params[0].value[0];
-        const date = new Date(timestamp);
-        let tooltip = `<div style="font-weight: 600; margin-bottom: 8px;">${date.toLocaleString()}</div>`;
+        const relativeSeconds = params[0].value[0];
+        const timeStr = formatRelativeTime(relativeSeconds);
+        let tooltip = `<div style="font-weight: 600; margin-bottom: 8px;">Time: ${timeStr}</div>`;
 
         params.forEach((param: any) => {
           const value = param.value[1];
@@ -203,18 +263,36 @@ export function createChartOption(
     },
     legend: {
       type: 'scroll',
-      bottom: 10,
+      right: 60,
+      bottom: 85, // Positioned above X-axis labels to avoid overlap
+      orient: 'horizontal',
+      backgroundColor: 'rgba(17, 24, 39, 0.9)',
+      borderColor: '#374151',
+      borderWidth: 1,
+      borderRadius: 6,
+      padding: [6, 10],
       textStyle: {
         color: '#9ca3af',
+        fontSize: 11,
       },
       pageTextStyle: {
         color: '#9ca3af',
       },
       pageIconColor: '#3b82f6',
       pageIconInactiveColor: '#4b5563',
+      itemWidth: 12,
+      itemHeight: 12,
     },
     xAxis: {
-      type: 'time',
+      type: 'value',
+      name: 'Time',
+      nameTextStyle: {
+        color: '#9ca3af',
+        fontSize: 12,
+        padding: [5, 0, 0, 0], // Padding above the name label
+      },
+      nameLocation: 'middle',
+      nameGap: 25, // Reduced to position Time label closer to axis
       axisLine: {
         lineStyle: {
           color: '#4b5563',
@@ -222,9 +300,9 @@ export function createChartOption(
       },
       axisLabel: {
         color: '#9ca3af',
+        margin: 8, // Add margin between labels and axis line
         formatter: (value: number) => {
-          const date = new Date(value);
-          return date.toLocaleTimeString();
+          return formatRelativeTime(value);
         },
       },
       splitLine: {
@@ -296,8 +374,8 @@ export function createChartOption(
         type: 'slider',
         xAxisIndex: 0,
         filterMode: 'none',
-        height: 30,
-        bottom: 50,
+        height: 20,
+        bottom: 10, // Positioned at bottom with Time label above it
         borderColor: '#4b5563',
         fillerColor: 'rgba(59, 130, 246, 0.2)',
         handleStyle: {
@@ -308,10 +386,13 @@ export function createChartOption(
         },
         textStyle: {
           color: '#9ca3af',
+          fontSize: 10,
         },
       },
     ],
     toolbox: {
+      right: 50 + (Math.floor(yAxisConfigs.filter(a => a.position === 'right').length / 1) * 60), // Align with grid right edge
+      top: -2, // Moved higher to avoid overlap with grid top
       feature: {
         dataZoom: {
           yAxisIndex: 'none',

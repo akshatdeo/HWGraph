@@ -71,11 +71,12 @@ export function TimeSeriesChart({ files, selectedSensors }: TimeSeriesChartProps
       console.log('Selected sensors:', Array.from(selectedSensors));
 
       // Transform data
-      const { series, yAxisConfigs } = transformToChartData(files, selectedSensors);
+      const { series, yAxisConfigs, startTimestamp } = transformToChartData(files, selectedSensors);
 
       console.log('Transformed series:', series.length);
       console.log('Y-axis configs:', yAxisConfigs.length);
       console.log('First series data points:', series[0]?.data?.length || 0);
+      console.log('Start timestamp:', startTimestamp);
 
       // Create chart option
       const option = createChartOption(series, yAxisConfigs);
@@ -91,9 +92,9 @@ export function TimeSeriesChart({ files, selectedSensors }: TimeSeriesChartProps
   }, [files, selectedSensors]);
 
   return (
-    <div className="flex-1 flex flex-col p-6 relative">
+    <div className="flex-1 flex flex-col p-4 relative overflow-hidden">
       {/* Chart Header */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between flex-shrink-0">
         <div>
           <h2 className="text-lg font-semibold text-gray-200">Time Series Chart</h2>
           <p className="text-sm text-gray-500">
@@ -121,7 +122,7 @@ export function TimeSeriesChart({ files, selectedSensors }: TimeSeriesChartProps
       </div>
 
       {/* Chart Container - Always render so ref is available */}
-      <div ref={chartRef} className="flex-1 min-h-0" style={{ minHeight: '400px' }} />
+      <div ref={chartRef} className="flex-1 min-h-0" />
 
       {/* Empty State Overlay */}
       {selectedSensors.size === 0 && (
@@ -133,16 +134,6 @@ export function TimeSeriesChart({ files, selectedSensors }: TimeSeriesChartProps
             <p className="text-xl text-gray-500 mb-2">No sensors selected</p>
             <p className="text-sm text-gray-600">Select sensors from the left panel to visualize data</p>
           </div>
-        </div>
-      )}
-
-      {/* Chart Tips */}
-      {selectedSensors.size > 0 && (
-        <div className="mt-4 text-xs text-gray-500 flex gap-6">
-          <span>💡 Drag to zoom into a time range</span>
-          <span>🖱️ Scroll to zoom in/out</span>
-          <span>🔍 Use the slider at the bottom to navigate</span>
-          <span>👆 Click legend items to show/hide series</span>
         </div>
       )}
     </div>

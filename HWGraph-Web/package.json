@@ -1,0 +1,42 @@
+{
+  "name": "hwgraph-web",
+  "productName": "HWGraph Web",
+  "version": "1.0.0",
+  "description": "Web-based performance data visualizer for HWiNFO CSV logs",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy"
+  },
+  "keywords": ["hwinfo", "performance", "visualization", "charts"],
+  "author": {
+    "name": "Akshat Deo",
+    "email": "akshatdeo103@gmail.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.5",
+    "idb": "^8.0.0",
+    "papaparse": "^5.5.3",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.23",
+    "firebase-tools": "^13.0.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "vite-plugin-pwa": "^0.20.0",
+    "workbox-window": "^7.0.0"
+  }
+}
